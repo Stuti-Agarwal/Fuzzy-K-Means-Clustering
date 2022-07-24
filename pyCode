@@ -1,0 +1,168 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+
+def read_file():
+    data = pd.read_csv("Data.csv", header=None)
+    data = data.to_numpy()
+    return data
+
+
+def train_test_split(data):
+    train = [data[x] for x in range(0, 600) if x % 5 != 0]
+    test = [data[x] for x in range(0, 600) if x % 5 == 0]
+    return train, test
+
+
+def findV():
+    v = np.zeros((c, 2))
+    for i in range(c):
+        num1 = 0
+        num2 = 0
+        den = 0
+        for k in range(N_train):
+            num1 = num1 + ((U[i][k]**m)*train[k][0])
+            num2 = num2 + ((U[i][k]**m)*train[k][1])
+            den = den + (U[i][k]**m)
+        v[i][0] = num1/den
+        v[i][1] = num2/den
+    return v
+
+
+def findD():
+    d_ik = 0
+    D = np.zeros((c, N_train))
+    for i in range(c):
+        for k in range(N_train):
+            d_ik = np.dot(np.transpose(train[k]-v[i]), (train[k]-v[i]))
+            D[i][k] = np.sqrt(d_ik)
+    return D
+
+
+def findU():
+    U = np.zeros((c, N_train))
+    col = []
+    for i in range(N_train):
+        col = np.random.dirichlet(np.ones(c))
+        for j in range(c):
+            U[j][i] = col[j]
+    return U
+
+
+def findU1():
+    for k in range(N_train):
+        set = 0
+        for i in range(c):
+            if(D[i][k] == 0):
+                U_1[i][k] = 1
+                set = 1
+                for j in range(c):
+                    if(j != i):
+                        U_1[j][k] = 0
+            else:
+                if(set == 0):
+                    den = 0
+                    for j in range(c):
+                        r = 2/(m-1)
+                        den = den + (D[i][k]/D[j][k])**r
+                    U_1[i][k] = 1/den
+    return U_1
+
+
+def calcR():
+    R = np.zeros(10)
+    for i in range(0, 9):
+        if i != 0 and i != 8:
+            z = i+1
+            l = i-1
+            R[i] = (Y[i]-Y[z])/(Y[l]-Y[i])
+
+    R[0] = 10
+    for i in range(len(R)):
+        if R[i] <= 0:
+            R[i] = 10
+    return R
+
+
+def test_plots():
+    out = []
+    N_test = len(test)
+    X1 = []
+    Y1 = []
+    for i in range(N_test):
+        D = []
+        for j in range(len(Centroid[0])):
+            D.append(np.sqrt((test[i][0]-Centroid[0][j][0])
+                     ** 2)+((test[i][1]-Centroid[0][j][1])**2))
+        out.append(D.index(min(D)))
+
+    for i in range(N_test):
+        X1.append(test[i][0])
+        Y1.append(test[i][1])
+
+    plt.scatter(X1, Y1, c=out, cmap=plt.cm.Paired)
+    plt.savefig('Clusters.png')
+    fig, axs = plt.subplots()
+
+    axs.plot(X, Y, color="red", label="Obj")
+    axs.set_xlabel("Clusters")
+    axs.plot(X, iterations, color="blue", label="Iteration")
+    plt.legend()
+
+    plt.savefig('Plot.png')
+    plt.show()
+
+
+data = read_file()
+train, test = train_test_split(data)
+
+N_train = len(train)
+
+m = 2
+X = []
+Y = []
+K = []
+iterations = []
+
+for c in range(2, 11):
+
+    X.append(c)
+    U_1 = np.zeros((c, N_train))
+    check = 9999999
+
+    U = findU()
+
+    it = 1
+    while(check > 0.001):
+
+        it += 1
+
+        v = findV()
+        D = findD()
+        U_1 = findU1()
+
+        error_norm = np.sqrt(abs(U**2 - U_1**2))
+        check = np.amax(error_norm)
+
+        if(check <= 0.001):
+            obj = 0
+            for i in range(c):
+                for k in range(N_train):
+                    obj = obj + (U_1[i][k]**m) * \
+                        np.dot((train[k]-v[i]), (train[k]-v[i]))
+
+            print(obj)
+            Y.append(obj)
+        else:
+            U = U_1
+            U_1 = np.zeros((c, N_train))
+    K.append(v)
+    iterations.append(it)
+
+R = calcR()
+
+Centroid = []
+Centroid.append(K[np.argmin(R)])
+
+test_plots()
